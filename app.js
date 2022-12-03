@@ -20,9 +20,10 @@ app.put('/students', jsonParser, (req, res) => {
 
 app.post('/merge', jsonParser,(req, res) => {
   mergePdf(req.query?.file1, req.query?.file2, res);
-})
+});
       
 app.get('/students/search', (req, res) => {
+ try {
   let result = [];
   const students = data.students;
   if(req.query?.name){
@@ -46,6 +47,9 @@ app.get('/students/search', (req, res) => {
     result = students.filter((item)=>item?.address?.city?.toLowerCase().includes(city));
   }
     res.send(result);
+ } catch(e) {
+  return sendErrorMessage(e, res);
+ }
 });
 
 
@@ -87,44 +91,64 @@ function sendResponse(res, message, fileName) {
 }
 
 async function createPdf(inputData, res){
-  const pdfBytes = await generatePdf("input.pdf", inputData);
-  const name = inputData?.name?.toLowerCase()?.split(' ')?.join('-');
-  const output = `${name}-${new Date().getTime()}.pdf`;
-  saveFile(output, pdfBytes, res, 'PDF Created');
+  try {
+    const pdfBytes = await generatePdf("input.pdf", inputData);
+    const name = inputData?.name?.toLowerCase()?.split(' ')?.join('-');
+    const output = `${name}-${new Date().getTime()}.pdf`;
+    saveFile(output, pdfBytes, res, 'PDF Created');
+  } catch(e) {
+    return sendErrorMessage(e, res);
+  }
+
 }
 
 async function updatePdf(input, inputData, res) {
-  const pdfBytes = await generatePdf(input, inputData);
-  saveFile(input, pdfBytes, res, 'PDF updated');
+  try {
+    const pdfBytes = await generatePdf(input, inputData);
+    saveFile(input, pdfBytes, res, 'PDF updated');
+  } catch (e) {
+    return sendErrorMessage(e, res);
+  }
+  
 }
 
-
-
 async function mergePdf(file1, file2, res){
-  const pdfBuffer1 = fs.readFileSync(`pdfs/${file1}`); 
-  const pdfBuffer2 = fs.readFileSync(`pdfs/${file2}`);
+  try {
+    const pdfBuffer1 = fs.readFileSync(`pdfs/${file1}`); 
+    const pdfBuffer2 = fs.readFileSync(`pdfs/${file2}`);
+    
+    const pdfsToMerge = [pdfBuffer1, pdfBuffer2]
+    
+    const mergedPdf = await PDFDocument.create(); 
+    for (const pdfBytes of pdfsToMerge) { 
+        const pdf = await PDFDocument.load(pdfBytes); 
+        const copiedPages = await mergedPdf.copyPages(pdf, pdf.getPageIndices());
+        copiedPages.forEach((page) => {
+             mergedPdf.addPage(page); 
+        }); 
+    } 
+    
+    const buf = await mergedPdf.save();
+    
+    const path = `pdfs/merged.pdf`; 
+    fs.open(path, 'w', function (err, fd) {
+        fs.write(fd, buf, 0, buf.length, null, function (err) {
+            fs.close(fd, function () {
+                res.send({
+                  message: 'Merged Successfully'
+                })
+            }); 
+        }); 
+    });
+  } catch(e){
+    return sendErrorMessage(e, res);
+  }
   
-  const pdfsToMerge = [pdfBuffer1, pdfBuffer2]
-  
-  const mergedPdf = await PDFDocument.create(); 
-  for (const pdfBytes of pdfsToMerge) { 
-      const pdf = await PDFDocument.load(pdfBytes); 
-      const copiedPages = await mergedPdf.copyPages(pdf, pdf.getPageIndices());
-      copiedPages.forEach((page) => {
-           mergedPdf.addPage(page); 
-      }); 
-  } 
-  
-  const buf = await mergedPdf.save();
-  
-  const path = `pdfs/merged.pdf`; 
-  fs.open(path, 'w', function (err, fd) {
-      fs.write(fd, buf, 0, buf.length, null, function (err) {
-          fs.close(fd, function () {
-              res.send({
-                message: 'Merged Successfully'
-              })
-          }); 
-      }); 
-  }); 
+}
+
+function sendErrorMessage(e, res){
+  return res.send({
+    status: 'Failure',
+    message: e.message
+  })
 }
