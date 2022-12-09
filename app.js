@@ -3,9 +3,12 @@ const data = require('./data.json');
 const {PDFDocument} = require('pdf-lib');
 const fs = require('fs');
 const util = require('util');
+const cors = require('cors');
 const app = express();
+app.use(cors());
 const bodyParser = require('body-parser');
 const jsonParser = bodyParser.json();
+
 
 
 app.post('/students', jsonParser, (req, res) => {
@@ -19,7 +22,7 @@ app.put('/students', jsonParser, (req, res) => {
 });
 
 app.post('/merge', jsonParser,(req, res) => {
-  mergePdf(req.query?.file1, req.query?.file2, res);
+  mergePdf(req.body?.file1, req.body?.file2, res);
 });
       
 app.get('/students/search', (req, res) => {
@@ -53,8 +56,8 @@ app.get('/students/search', (req, res) => {
 });
 
 
-app.listen(3000, () => {
-  console.log('🚀 listening on port 3000!');
+app.listen(8000, () => {
+  console.log('🚀 listening on port 8000!');
 });
 
 
